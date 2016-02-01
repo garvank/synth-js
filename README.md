@@ -61,7 +61,7 @@ mySynth.sequence(track, bpm, loops);
 Simply include a hew hash with the key ramp, to specify the frequency you'd like to bend to.
 ```javascript
 var bender_bass = {
-  type: 'sawtooth',
+  type: 'sine',
   frequency: 100,
   duration: .3,
   ramp: {

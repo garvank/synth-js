@@ -6,12 +6,18 @@
  */
 
 var kick = {
-  type: 'sawtooth',
+  type: 'sine',
   frequency: 100,
   duration: .3,
   ramp: {
-    to: 50
+    to: 70
   }
+};
+
+var snare = {
+  type: 'square',
+  frequency: 100,
+  duration: .05,
 };
 
 var beep_a = {
