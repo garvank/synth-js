@@ -1,5 +1,9 @@
 # SynthJS
-An API to work with WebAudio API to generate sounds. The global namespace is set to `Synth`.
+An API to work with WebAudio API to generate sounds. 
+Make a new synth like so:
+```javascript
+var mySynth = new Synth();
+```
 
 ## Examples
 You can make sounds as simple objects. 
@@ -41,7 +45,7 @@ var beep_fsharp = {
 
 ### Play an individual sound
 ```javascript
-Synth.play(beep_a);
+mySynth.play(beep_a);
 ```
 
 ### Sequence a track of sounds
@@ -50,7 +54,7 @@ var track = [beep_a, beep_d, beep_fsharp],
     bpm   = 200,
     loops = 1; // Currently a todo
     
-Synth.sequence(track, bpm, loops);
+mySynth.sequence(track, bpm, loops);
 ```
 
 ### Add a pitchbend

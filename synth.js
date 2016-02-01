@@ -14,7 +14,7 @@ var kick = {
   }
 };
 
-var beep1 = {
+var beep_a = {
   type: 'triangle',
   frequency: 440,
   duration: .2,
@@ -25,7 +25,7 @@ var beep1 = {
   }
 };
 
-var beep2 = {
+var beep_d = {
   type: 'triangle',
   frequency: 587.33,
   duration: .2,
@@ -36,7 +36,7 @@ var beep2 = {
   }
 };
 
-var beep3 = {
+var beep_fsharp = {
   type: 'triangle',
   frequency: 739.99,
   duration: .2,
@@ -54,15 +54,9 @@ var beep3 = {
  *  Declare namespace
  */
 
-var Synth = {};
-
-
-
-/* 
- *  Build master audio context
- */
-
-Synth.context = new AudioContext();
+var Synth = function(){
+  this.context = new AudioContext();
+};
 
 
 
@@ -70,27 +64,28 @@ Synth.context = new AudioContext();
  *  Accepts a "sound" object and plays it
  */
 
-Synth.play = function(sound){
+Synth.prototype.play = function(sound){
 
-  var osc = Synth.context.createOscillator(),
+  var self = this,
+      osc = self.context.createOscillator(),
       connection;
       
       // Supported: ['sine', 'triangle', 'sawtooth', 'square']
       osc.type = sound.type;
-      osc.frequency.setValueAtTime(sound.frequency, Synth.context.currentTime);
+      osc.frequency.setValueAtTime(sound.frequency, self.context.currentTime);
       connection = osc;
 
       // Manipulate frequency over time
       if(sound.ramp){
         osc.frequency.linearRampToValueAtTime(
           sound.ramp.to, 
-          Synth.context.currentTime + sound.duration
+          self.context.currentTime + sound.duration
         );  
       }
 
       // Apply filter if requested
       if(sound.filter){
-        var filter = Synth.context.createBiquadFilter();
+        var filter = self.context.createBiquadFilter();
 
         filter.type = sound.filter.type;
         filter.frequency.value = sound.filter.frequency;
@@ -102,9 +97,9 @@ Synth.play = function(sound){
       }
       
 
-      connection.connect(Synth.context.destination);
-      osc.start(Synth.context.currentTime);
-      osc.stop(Synth.context.currentTime + sound.duration);
+      connection.connect(this.context.destination);
+      osc.start(this.context.currentTime);
+      osc.stop( this.context.currentTime + sound.duration);
 };
 
 
@@ -113,7 +108,7 @@ Synth.play = function(sound){
  *  Calculates BPM
  */
  
-Synth.calculateBpm = function(bpm){
+Synth.prototype.calculateBpm = function(bpm){
   
   var second = 1000,
       minute = second * 60
@@ -128,10 +123,13 @@ Synth.calculateBpm = function(bpm){
  *  Accepts an array of sounds to sequence and a bpm
  */
 
-Synth.sequence = function(queue, bpm, loops){
+Synth.prototype.sequence = function(queue, bpm, loops){
   
+  var self = this;
+
   // Get BPM delay in milliseconds
-  var calculated_bpm = Synth.calculateBpm(bpm);
+  var calculated_bpm = this.calculateBpm(bpm);
+  
   
   // Play each sound, then wait for the offset 
   for(i=0; i < queue.length; i++){
@@ -139,7 +137,7 @@ Synth.sequence = function(queue, bpm, loops){
     (function(offset){
       
       setTimeout(function(){
-        Synth.play(queue[offset]);
+        self.play(queue[offset]);
 
       }, offset * calculated_bpm)
 
