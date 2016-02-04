@@ -12,16 +12,20 @@ var kick = {
   vol: 1,
   ramp: {
     to: 70
+  },
+  env: {
+    decay: 20
   }
 };
 
 var snare = {
   type: 'square',
   frequency: 100,
-  duration: 1,
+  duration: .05,
   vol: 1,
   env: {
-    attack: 70
+    attack: 10,
+    decay: 20
   }
 };
 
@@ -80,8 +84,9 @@ var Synth = function(){
 
 Synth.prototype.play = function(sound){
 
-  var self = this,
-      osc = self.context.createOscillator(),
+  var self  = this,
+      osc   = self.context.createOscillator(),
+      decay = 0,
       connection;
       
       // Supported: ['sine', 'triangle', 'sawtooth', 'square']
@@ -94,7 +99,7 @@ Synth.prototype.play = function(sound){
 
         var bendAt = sound.ramp.at || sound.duration;
 
-        osc.frequency.linearRampToValueAtTime(
+        connection.frequency.linearRampToValueAtTime(
           sound.ramp.to, 
           self.context.currentTime + bendAt
         );  
@@ -115,22 +120,30 @@ Synth.prototype.play = function(sound){
 
 
       if(sound.env){
-        var gainNode = self.context.createGain(),
+        var gainNode   = self.context.createGain(),
             attackPeak = self.context.currentTime + ((sound.env.attack/100) * sound.duration);
-            console.log(self.context.currentTime);
-            console.log(attackPeak);
 
-        gainNode.gain.value = 0.1;
-        gainNode.gain.setTargetAtTime(sound.vol, self.context.currentTime, attackPeak);
-        
+        if(sound.env.attack){
+          gainNode.gain.value = 0;
+          gainNode.gain.setValueAtTime(0.0, self.context.currentTime);
+          gainNode.gain.linearRampToValueAtTime(sound.vol, attackPeak);
+        }
+
+        if(sound.env.decay){
+          decay = (100/sound.env.decay) * sound.duration;
+          gainNode.gain.setTargetAtTime(0.0, self.context.currentTime + sound.duration, 0.5);
+        }
+
+
+
         connection.connect(gainNode);
         connection = gainNode;
       }
       
 
-      connection.connect(this.context.destination);
-      osc.start(this.context.currentTime);
-      osc.stop( this.context.currentTime + sound.duration);
+      connection.connect(self.context.destination);
+      osc.start(self.context.currentTime);
+      osc.stop(self.context.currentTime + sound.duration + decay);
 
 };
 
