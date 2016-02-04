@@ -76,7 +76,7 @@ frequency, and gain for the modulator
 ```javascript
 var modulator = {
   type: 'sine',
-  frequency: 660,
+  freq: 660,
   gain: 300
 };
 mySynth.addModulator(modulator);
