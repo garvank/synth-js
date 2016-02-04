@@ -73,9 +73,11 @@ var bender_bass = {
 ### Add a frequency modulator
 Modulators can be added before or after (with no duration) playing a sound. You need to specify the type,
 frequency, and gain for the modulator
+```javascript
 var modulator = {
   type: 'sine',
   frequency: 660,
   gain: 300
 };
 mySynth.addModulator(modulator);
+```
