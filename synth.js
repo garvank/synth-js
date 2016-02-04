@@ -9,6 +9,7 @@ var kick = {
   type: 'sine',
   frequency: 100,
   duration: .3,
+  vol: 1,
   ramp: {
     to: 70
   }
@@ -17,13 +18,18 @@ var kick = {
 var snare = {
   type: 'square',
   frequency: 100,
-  duration: .05,
+  duration: 1,
+  vol: 1,
+  env: {
+    attack: 70
+  }
 };
 
 var beep_a = {
   type: 'triangle',
   frequency: 440,
   duration: .2,
+  vol: 1,
   filter: {
     frequency: 1000,
     type: 'highpass',
@@ -35,6 +41,7 @@ var beep_d = {
   type: 'triangle',
   frequency: 587.33,
   duration: .2,
+  vol: 1,
   filter: {
     frequency: 1000,
     type: 'highpass',
@@ -46,6 +53,7 @@ var beep_fsharp = {
   type: 'triangle',
   frequency: 739.99,
   duration: .2,
+  vol: 0.1,
   filter: {
     frequency: 1000,
     type: 'highpass',
@@ -83,9 +91,12 @@ Synth.prototype.play = function(sound){
 
       // Manipulate frequency over time
       if(sound.ramp){
+
+        var bendAt = sound.ramp.at || sound.duration;
+
         osc.frequency.linearRampToValueAtTime(
           sound.ramp.to, 
-          self.context.currentTime + sound.duration
+          self.context.currentTime + bendAt
         );  
       }
 
@@ -101,11 +112,26 @@ Synth.prototype.play = function(sound){
         connection = filter;
 
       }
+
+
+      if(sound.env){
+        var gainNode = self.context.createGain(),
+            attackPeak = self.context.currentTime + ((sound.env.attack/100) * sound.duration);
+            console.log(self.context.currentTime);
+            console.log(attackPeak);
+
+        gainNode.gain.value = 0.1;
+        gainNode.gain.setTargetAtTime(sound.vol, self.context.currentTime, attackPeak);
+        
+        connection.connect(gainNode);
+        connection = gainNode;
+      }
       
 
       connection.connect(this.context.destination);
       osc.start(this.context.currentTime);
       osc.stop( this.context.currentTime + sound.duration);
+
 };
 
 
@@ -134,7 +160,7 @@ Synth.prototype.sequence = function(queue, bpm, loops){
   var self = this;
 
   // Get BPM delay in milliseconds
-  var calculated_bpm = this.calculateBpm(bpm);
+  var calculated_bpm = self.calculateBpm(bpm);
   
   
   // Play each sound, then wait for the offset 
