@@ -1,157 +1,175 @@
+(function (root) {
 
+   function Synth() {
+     this.context = new AudioContext();
+     this.modulators = [];
+   }
 
-
-/* 
- *  Some presets 
- */
-
-var kick = {
-  type: 'sine',
-  frequency: 100,
-  duration: .3,
-  ramp: {
-    to: 70
-  }
-};
-
-var snare = {
-  type: 'square',
-  frequency: 100,
-  duration: .05,
-};
-
-var beep_a = {
-  type: 'triangle',
-  frequency: 440,
-  duration: .2,
-  filter: {
-    frequency: 1000,
-    type: 'highpass',
-    gain: 25
-  }
-};
-
-var beep_d = {
-  type: 'triangle',
-  frequency: 587.33,
-  duration: .2,
-  filter: {
-    frequency: 1000,
-    type: 'highpass',
-    gain: 25
-  }
-};
-
-var beep_fsharp = {
-  type: 'triangle',
-  frequency: 739.99,
-  duration: .2,
-  filter: {
-    frequency: 1000,
-    type: 'highpass',
-    gain: 25
-  }
-};
-
-
-
-
-/* 
- *  Declare namespace
- */
-
-var Synth = function(){
-  this.context = new AudioContext();
-};
-
-
-
-/* 
- *  Accepts a "sound" object and plays it
- */
-
-Synth.prototype.play = function(sound){
-
-  var self = this,
-      osc = self.context.createOscillator(),
-      connection;
-      
-      // Supported: ['sine', 'triangle', 'sawtooth', 'square']
-      osc.type = sound.type;
-      osc.frequency.setValueAtTime(sound.frequency, self.context.currentTime);
-      connection = osc;
-
-      // Manipulate frequency over time
-      if(sound.ramp){
-        osc.frequency.linearRampToValueAtTime(
-          sound.ramp.to, 
-          self.context.currentTime + sound.duration
-        );  
+  /*
+   * Some presets - static properties on Synth
+   */
+   Synth.presets = {
+    kick: {
+      type: 'sine',
+      frequency: 100,
+      duration: .3,
+      ramp: {
+        to: 70
       }
-
-      // Apply filter if requested
-      if(sound.filter){
-        var filter = self.context.createBiquadFilter();
-
-        filter.type = sound.filter.type;
-        filter.frequency.value = sound.filter.frequency;
-        filter.gain.value = sound.filter.gain;
-
-        connection.connect(filter);
-        connection = filter;
-
+    },
+    snare: {
+      type: 'square',
+      frequency: 100,
+      duration: .05,
+    },
+    beep_a: {
+      type: 'triangle',
+      frequency: 440,
+      duration: .2,
+      filter: {
+        frequency: 1000,
+        type: 'highpass',
+        gain: 25
       }
-      
+    },
+    beep_d: {
+      type: 'triangle',
+      frequency: 587.33,
+      duration: .2,
+      filter: {
+        frequency: 1000,
+        type: 'highpass',
+        gain: 25
+      }
+    },
+    beep_fsharp: {
+      type: 'triangle',
+      frequency: 739.99,
+      duration: .2,
+      filter: {
+        frequency: 1000,
+        type: 'highpass',
+        gain: 25
+      }
+    }
+  };
 
-      connection.connect(this.context.destination);
-      osc.start(this.context.currentTime);
-      osc.stop( this.context.currentTime + sound.duration);
-};
+  Synth.prototype.addModulator = function (modulator) {
+    var carrier;
+    var mod = new Modulator(this.context, modulator.type, modulator.freq, modulator.gain);
 
+    if (this.carrier) {
+      carrier = this.modulators.length ? this.modulators[this.modulators.length - 1].osc : this.carrier;
+      mod.gainNode.connect(carrier.frequency);
+    }
+    this.modulators.push(mod);
+    return mod;
+  };
 
+  /*
+   *  Accepts a "sound" object and plays it
+   */
+  Synth.prototype.play = function(sound){
 
-/* 
- *  Calculates BPM
- */
- 
-Synth.prototype.calculateBpm = function(bpm){
-  
-  var second = 1000,
-      minute = second * 60
-      bpms   = minute/bpm;
+    var filter;
+    var destination;
 
-  return bpms;
-}
+    // Supported: ['sine', 'triangle', 'sawtooth', 'square']
+    this.carrier = this.context.createOscillator();
+    this.carrier.type = sound.type;
+    this.carrier.frequency.setValueAtTime(sound.frequency, this.context.currentTime);
 
+    destination = this.context.createGain();
+    destination.gain.value = 0.5;
+    destination.connect(this.context.destination);
+    this.gainNode = this.context.createGain();
+    this.gainNode.gain.value = 1;
+    this.gainNode.connect(destination);
+    this.carrier.connect(this.gainNode);
 
+    // Manipulate frequency over time
+    if(sound.ramp){
+      this.carrier.frequency.linearRampToValueAtTime(
+        sound.ramp.to,
+        this.context.currentTime + sound.duration
+      );
+    }
 
-/* 
- *  Accepts an array of sounds to sequence and a bpm
- */
+    // Apply filter if requested
+    if(sound.filter){
+      filter = this.context.createBiquadFilter();
+      filter.type = sound.filter.type;
+      filter.frequency.value = sound.filter.frequency;
+      filter.gain.value = sound.filter.gain;
+      filter.connect(this.carrier.frequency);
+    }
 
-Synth.prototype.sequence = function(queue, bpm, loops){
-  
-  var self = this;
+    var connectModulators = (function () {
+      var carrier = this.carrier;
+      this.modulators.length && this.modulators.forEach(function (mod) {
+        mod.gainNode.connect(carrier.frequency);
+        carrier = mod.osc;
+      });
+    }).bind(this);
 
-  // Get BPM delay in milliseconds
-  var calculated_bpm = this.calculateBpm(bpm);
-  
-  
-  // Play each sound, then wait for the offset 
-  for(i=0; i < queue.length; i++){
+    connectModulators();
 
-    (function(offset){
-      
-      setTimeout(function(){
-        self.play(queue[offset]);
+    this.carrier.start(this.context.currentTime);
 
-      }, offset * calculated_bpm)
+    if (sound.duration) {
+      this.carrier.stop( this.context.currentTime + sound.duration);
+    }
+  };
 
-    })(i);
+  Synth.prototype.stop = function () {
+    this.gainNode.gain.value = 0;
+    this.modulators.length = 0;
   }
-};
+  /*
+   *  Calculates BPM
+   */
+  Synth.prototype.calculateBpm = function(bpm){
+
+    var second = 1000,
+        minute = second * 60
+        bpms   = minute/bpm;
+
+    return bpms;
+  }
+
+  /*
+   *  Accepts an array of sounds to sequence and a bpm
+   */
+  Synth.prototype.sequence = function(queue, bpm, loops){
+
+    // Get BPM delay in milliseconds
+    var calculated_bpm = this.calculateBpm(bpm);
+
+    // Play each sound, then wait for the offset
+    for(i=0; i < queue.length; i++){
+      ((function(offset){
+        setTimeout((function(){
+          this.play(queue[offset]);
+        }).bind(this), offset * calculated_bpm)
+      }).bind(this))(i);
+    }
+  };
+
+  // A modulator have a this.carrierillator and a gain
+  function Modulator (context, type, freq, gain) {
+    this.osc = context.createOscillator();
+    this.gainNode = context.createGain();
+    this.osc.type = type;
+    this.osc.frequency.value = freq;
+    this.gainNode.gain.value = gain;
+    this.osc.connect(this.gainNode);
+    this.osc.start(0);
+  }
+
+  Synth.prototype.gain = function (gain) {
+    this.gainNode.gain.value = gain;
+  }
 
 
-
-
-
+  root.Synth = Synth;
+})(window);
