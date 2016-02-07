@@ -1,12 +1,12 @@
 # SynthJS
-An API to work with WebAudio API to generate sounds. 
+An API to work with WebAudio API to generate sounds.
 Make a new synth like so:
 ```javascript
 var mySynth = new Synth();
 ```
 
 ## Examples
-You can make sounds as simple objects. 
+You can make sounds as simple objects.
 For example, let's make 3 simple beeps tuned to A, D, & F#:
 ```javascript
 var beep_a = {
@@ -53,7 +53,7 @@ mySynth.play(beep_a);
 var track = [beep_a, beep_d, beep_fsharp],
     bpm   = 200,
     loops = 1; // Currently a todo
-    
+
 mySynth.sequence(track, bpm, loops);
 ```
 
@@ -68,4 +68,16 @@ var bender_bass = {
     to: 50
   }
 };
+```
+
+### Add a frequency modulator
+Modulators can be added before or after (with no duration) playing a sound. You need to specify the type,
+frequency, and gain for the modulator
+```javascript
+var modulator = {
+  type: 'sine',
+  freq: 660,
+  gain: 300
+};
+mySynth.addModulator(modulator);
 ```
