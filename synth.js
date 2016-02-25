@@ -7,8 +7,12 @@
    */
 
    function Synth() {
-     this.context = new AudioContext();
-     this.modulators = [];
+      this.context = new AudioContext();
+      this.modulators = [];
+      this.noise = {
+        node: null,
+        started: false
+      };
    }
 
 
@@ -22,22 +26,28 @@
       kick: {
         type: 'sine',
         frequency: 100,
-        duration: .3,
-        vol: 1,
+        duration: .05,
+        volume: 1,
         ramp: {
           to: 70
         },
         env: {
-          decay: 20
+          decay: 0.5
         }
       },
-      snare: {
+      hat: {
         type: 'square',
-        frequency: 100,
+        frequency: 00,
         duration: .05,
+        volume: 0.05,
+        whiteNoise: true,
         env: {
-          attack: 5,
-          decay: 30
+          decay: 0.5
+        },
+        filter:{
+          type: 'highpass',
+          frequency: 60,
+          gain: 20
         }
       },
       beeper: {
@@ -53,6 +63,11 @@
         env: {
           decay: 15
         }
+      },
+      rest: {
+        type: 'sine',
+        vol: 0.0,
+        frequency: 0
       }
     };
   
@@ -98,20 +113,23 @@
     Synth.prototype.play = function(sound){
   
       var filter,
-          destination;
+          chainableNode;
   
-      // Supported: ['sine', 'triangle', 'sawtooth', 'square']
+  
       this.carrier = setupCarrier(sound, this.context);
   
-      destination = this.context.createGain();
-      destination.gain.value = 0.5;
-      destination.connect(this.context.destination);
 
       this.gainNode = this.context.createGain();
-      this.gainNode.gain.value = 1;
-      this.gainNode.connect(destination);
+      this.gainNode.gain.value = sound.volume || 1;
 
       this.carrier.connect(this.gainNode);
+      chainableNode = this.gainNode;
+
+      // Make white noise
+      if(sound.whiteNoise){
+        this.noise.node = addNoise(this.context, this);
+        
+      }
   
       // Bend frequency over time
       if(sound.ramp){
@@ -124,12 +142,17 @@
       // Apply filter if requested
       if(sound.filter){
         filter = this.context.createBiquadFilter();
-        filter.type = sound.filter.type;
-        filter.frequency.value = sound.filter.frequency;
-        filter.gain.value = sound.filter.gain;
-        filter.connect(this.carrier.frequency);
+
+        filter.type = sound.filter.type || warn('Filter "type" is required');
+        filter.frequency.value = sound.filter.frequency || warn('Filter "frequency" is required');
+        filter.gain.value = sound.filter.gain || warn('Filter "gain" is required');
+        
+        chainableNode.connect(filter);
+        chainableNode = filter;
       }
       
+
+      chainableNode.connect(this.context.destination);
       this.start(sound);
   
       if (sound.duration) {
@@ -146,7 +169,7 @@
     Synth.prototype.start = function(sound) {
       
       if(sound && sound.env && sound.env.attack){
-        var attackPeak = this.context.currentTime + ((sound.env.attack/100) * sound.duration),
+        var attackPeak = this.context.currentTime + ((sound.env.attack/100) * sound.duration) || sound.vol,
             volume = sound.vol || 1;
         
         this.gain(0);
@@ -165,16 +188,27 @@
    */
 
     Synth.prototype.stop = function(sound) {
+
+      var endTime = 0;
+
       if(sound && sound.env && sound.env.decay){
-        var decay = (sound.env.decay/100) * sound.duration + 0.2;
-        this.gainNode.gain.setTargetAtTime(0.0, this.context.currentTime + sound.duration + decay, 0.5);
-      }else {
-        this.gain(0);  
+        var decay = (sound.env.decay/100) * sound.duration;
+        endTime = this.context.currentTime + sound.duration + decay;
+        this.gainNode.gain.setTargetAtTime(0.0, endTime, 0.1);
+
+      }else if(sound && sound.duration){
+        endTime = this.context.currentTime + sound.duration;
+        this.carrier.stop(endTime); 
+        this.gainNode.gain.setValueAtTime(0.0, endTime);
+
+      }else{
+        this.gain(0);
       }
 
-      this.modulators.length = 0;
-    }
 
+      this.modulators.length = 0;
+      
+    }
 
 
   /*
@@ -243,6 +277,32 @@
     }
 
 
+    // Noise can be added to sound
+    function addNoise(context, synth) {
+        var noise      = context.createBufferSource(),
+            channels   = 2,
+            frameCount = context.sampleRate * 2.0,
+            bufferNode = context.createBuffer(2, frameCount, context.sampleRate);
+        
+
+        for (var channel = 0; channel < channels; channel++) {
+          var nowBuffering = bufferNode.getChannelData(channel);
+
+          for (var i = 0; i < frameCount; i++) {
+            nowBuffering[i] = Math.random() * 2 - 1;
+          }
+        }
+      
+
+        noise.buffer = bufferNode;
+        noise.connect(synth.gainNode);
+        noise.loop = true;
+        noise.start(context.currentTime);
+        
+        return noise;
+    };
+
+
     // Set up carrier oscillator node
     function setupCarrier(sound, context) {
       var carrier = context.createOscillator();
@@ -254,7 +314,32 @@
     }
 
 
+    // Issue warning and return 0.0
+    function warn(message){
+      console.warn(message);
+      return 0.0;
+    }
+
+
 
   root.Synth = Synth;
 
 })(window);
+
+synth = new Synth();
+function playBeat(){
+  hat = Synth.presets.hat;
+  kick  = Synth.presets.kick;
+  rest  = Synth.presets.rest;
+  beep  = Synth.presets.beeper;
+  bpm   = 120;
+
+
+  track1 = [kick,  rest,  kick,  rest, kick,  kick,  rest,  kick ];
+  track2 = [rest,  hat,   rest,  hat,  rest,  hat,   hat,  hat  ];
+  
+
+  synth.sequence(track1, bpm, 1);
+  synth.sequence(track2, bpm, 1);
+}
+
